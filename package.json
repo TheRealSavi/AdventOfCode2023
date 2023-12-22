@@ -1,0 +1,17 @@
+{
+  "name": "adventofcode2023",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dayselect.bat",
+  "scripts": {
+    "start": "dayselect.bat"
+  },
+  "config": {
+    "day": 1
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
