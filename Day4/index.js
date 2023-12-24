@@ -1,8 +1,7 @@
-const { match } = require("assert");
 const fs = require("fs");
 const readline = require("readline");
 
-const inputFile = "Day4/test.txt";
+const inputFile = "Day4/input.txt";
 const fileStream = fs.createReadStream(inputFile);
 
 const rl = readline.createInterface({
