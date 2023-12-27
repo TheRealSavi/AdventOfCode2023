@@ -22,6 +22,7 @@ rl.on("line", (line) => {
 });
 
 rl.on("close", () => {
+  //part 1
   seeds.forEach((seed) => {
     const location = sourceValueToDestinationValue("seed", "location", seed);
     if (location < lowestLocationValue) {
@@ -30,18 +31,18 @@ rl.on("close", () => {
   });
   console.log("Lowest Seed Location: " + lowestLocationValue);
 
+  //part 2
   seedRanges.forEach((seedRange) => {
-    const locationRanges = sourceRangeToDestinationRange(
-      "seed",
-      "location",
-      seedRange
-    );
+    let locationRanges = mapRangesToDestination("seed", "location", [
+      seedRange,
+    ]) || [[]];
 
-    if (
-      locationRanges.sort((a, b) => {
-        a[0] - b[0];
-      }) < lowestLocationValue[0]
-    ) {
+    locationRanges = locationRanges.sort((a, b) => {
+      return a[0] - b[0];
+    });
+
+    //if there is a smaller location in one of the ranges then store it
+    if (locationRanges[0][0] < lowestLocationValue2) {
       lowestLocationValue2 = locationRanges[0][0];
     }
   });
@@ -80,18 +81,19 @@ const parseLine = (line) => {
     const values = line.split(" ");
     if (values.length == 3 && buildingMap) {
       const map = {
-        destRangeStart: parseInt(values[0], 10),
-        srcRangeStart: parseInt(values[1], 10),
-        rangeLength: parseInt(values[2], 10),
-        srcRangeEnd: parseInt(values[1], 10) + parseInt(values[2], 10) - 1,
+        range: [
+          parseInt(values[1], 10),
+          parseInt(values[1], 10) + parseInt(values[2], 10) - 1,
+        ],
+        d: parseInt(values[0], 10) - parseInt(values[1], 10),
       };
       buildingMap.values.push(map);
     }
   }
 };
 
-//doesnt work at all and i dont want to talk about it
-const sourceRangeToDestinationRange = (source, destination, rangeToMap) => {
+//part 2
+const mapRangesToDestination = (source, destination, ranges) => {
   const sourceMap = maps.find((map) => {
     //finds that can convert our source value
     return map.source == source;
@@ -101,81 +103,87 @@ const sourceRangeToDestinationRange = (source, destination, rangeToMap) => {
     return -1; //if its not found returns a -1 for error handling by parent
   }
 
-  let destRanges = [];
+  let mappedRanges = [];
 
-  let ranges = sourceMap.values.sort((a, b) => {
-    return a.srcRangeStart - b.srcRangeStart;
-  });
+  ranges.forEach((range) => {
+    let subMaps = [];
+    sourceMap.values.forEach((map) => {
+      //if not overlaping
+      if (map.range[1] < range[0] || map.range[0] > range[1]) {
+        //whatever
+      } else {
+        const subRange = [
+          Math.max(map.range[0], range[0]),
+          Math.min(map.range[1], range[1]),
+        ];
+        subMaps.push({ range: subRange, d: map.d });
+      }
+    });
+    //sort submaps
+    subMaps = subMaps.sort((a, b) => {
+      return a.range[0] - b.range[0];
+    });
+    //fill middle gaps
+    let gapMaps = [];
+    subMaps.map((map, i) => {
+      if (subMaps[i + 1]) {
+        if (map.range[1] + 1 != subMaps[i + 1].range[0]) {
+          gapMaps.push({
+            range: [map.range[1] + 1, subMaps[i + 1].range[0] - 1],
+            d: 0,
+          });
+        }
+      }
+    });
+    subMaps.push(...gapMaps);
+    //sort submaps
+    subMaps = subMaps.sort((a, b) => {
+      return a.range[0] - b.range[0];
+    });
 
-  //creates a range if there were no ranges to cover the edges
-  const rangeGaps = [];
-  if (ranges[0].srcRangeStart > rangeToMap[0]) {
-    rangeGaps.push({
-      srcRangeStart: rangeToMap[0],
-      srcRangeEnd: ranges[0].srcRangeStart - 1,
-      destRangeStart: rangeToMap[0],
-    });
-  }
-  if (ranges[ranges.length - 1].srcRangeEnd < rangeToMap[1]) {
-    rangeGaps.push({
-      srcRangeStart: ranges[ranges.length - 1].srcRangeEnd + 1,
-      srcRangeEnd: rangeToMap[1],
-      destRangeStart: ranges[ranges.length - 1].srcRangeEnd + 1,
-    });
-  }
-  //fills middle range gaps
-  ranges.forEach((range, i) => {
-    if (ranges[i + 1]) {
-      if (range.srcRangeEnd + 1 < ranges[i + 1].srcRangeStart) {
-        rangeGaps.push({
-          srcRangeStart: range.srcRangeEnd + 1,
-          srcRangeEnd: ranges[i + 1].srcRangeStart - 1,
-          destRangeStart: range.srcRangeEnd + 1,
+    //if no ranges were found to map then its just a 1:1
+    if (subMaps.length == 0) {
+      subMaps.push({ range: [range[0], range[1]], d: 0 });
+    } else {
+      //if there is a gap at the start fill it
+      if (subMaps[0].range[0] != range[0]) {
+        subMaps.push({ range: [range[0], subMaps[0].range[0] - 1], d: 0 });
+      }
+      //sort submaps
+      subMaps = subMaps.sort((a, b) => {
+        return a.range[0] - b.range[0];
+      });
+      //if there is a gap at the end fill it
+      if (subMaps[subMaps.length - 1].range[1] != range[1]) {
+        subMaps.push({
+          range: [subMaps[subMaps.length - 1].range[1] + 1, range[1]],
+          d: 0,
         });
       }
     }
-  });
-  ranges.push(...rangeGaps);
-  ranges = sourceMap.values.sort((a, b) => {
-    return a.srcRangeStart - b.srcRangeStart;
-  });
 
-  //map rangeToMap to subsections of ranges
-  ranges.forEach((range) => {
-    if (
-      (range.srcRangeEnd >= rangeToMap[0] &&
-        range.srcRangeEnd <= rangeToMap[1]) ||
-      (range.srcRangeStart <= rangeToMap[1] &&
-        range.srcRangeStart >= rangeToMap[0])
-    ) {
-      //the range overlaps
-      destRanges.push([
-        Math.max(range.srcRangeStart, rangeToMap[0]) +
-          range.destRangeStart -
-          range.srcRangeStart,
+    // console.log(range);
+    // console.log(subMaps);
 
-        Math.min(range.srcRangeEnd, rangeToMap[1]) +
-          range.destRangeStart -
-          range.srcRangeStart,
-      ]);
-    }
+    subMaps.map((map) => {
+      mappedRanges.push([map.range[0] + map.d, map.range[1] + map.d]);
+    });
   });
 
   if (sourceMap.destination != destination) {
     //if the map we just used doesnt convert our value to the destination we want
     //we need to convert the value again
-    let finalRanges = [];
-    destRanges.forEach((range) => {
-      finalRanges.push(
-        sourceRangeToDestinationRange(sourceMap.destination, destination, range)
-      );
-    });
-    return finalRanges.flat();
+    return mapRangesToDestination(
+      sourceMap.destination, //starting at the source of our new value which is this sources destination
+      destination, //we still want to go to the original destination
+      mappedRanges //with the value of the new value we just found
+    );
   } else {
-    return destRanges;
+    return mappedRanges; //when the destination is correct we can return the final value
   }
 };
 
+//part 1
 //this approach only really works for part 1 because it does it for one value not considering ranges. this is just too ridiculus to run billions of times. works for part 1 though
 const sourceValueToDestinationValue = (source, destination, value) => {
   const sourceMap = maps.find((map) => {
@@ -187,17 +195,16 @@ const sourceValueToDestinationValue = (source, destination, value) => {
     return -1; //if its not found returns a -1 for error handling by parent
   }
 
-  const conversionTable = sourceMap.values.find((table) => {
+  const rangeMap = sourceMap.values.find((map) => {
     //finds the conversiontable that would convert our value
-    return value >= table.srcRangeStart && value <= table.srcRangeEnd;
+    return value >= map.range[0] && value <= map.range[1];
   });
 
   let destValue;
-  if (!conversionTable) {
+  if (!rangeMap) {
     destValue = value; //if the value isnt in any conversiontables then the destination value is the same as the source value
   } else {
-    destValue =
-      conversionTable.destRangeStart + (value - conversionTable.srcRangeStart); //otherwise the destination value is the distance of the value from the sourcestart applied to the destination range start
+    destValue = rangeMap.d + value; //otherwise the destination value is the distance of the value from the sourcestart applied to the destination range start
   }
 
   if (sourceMap.destination != destination) {
